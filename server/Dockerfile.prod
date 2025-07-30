@@ -1,0 +1,18 @@
+FROM node:18
+
+WORKDIR /app
+
+# 빌드 스크립트 실행 전 필요한 파일만 복사
+COPY package.json ./
+COPY build.js ./
+COPY server.js ./
+RUN npm install --only=prod
+RUN npm install --save-dev esbuild
+RUN node build.js
+
+# 실행 파일만 복사
+FROM node:18
+WORKDIR /app
+COPY --from=0 /app/dist/server.bundle.js .
+RUN npm install express
+CMD ["node", "server.bundle.js"]
