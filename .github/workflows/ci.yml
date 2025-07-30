@@ -37,7 +37,7 @@ jobs:
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
           port: 2203  # ✅ SSH 포트가 2203일 경우 명시적으로 지정
           script: |
             bash ${{ secrets.DEPLOY_PATH }}
