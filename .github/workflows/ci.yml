@@ -10,7 +10,7 @@ jobs:
 
     env:
       REGISTRY: docker.io
-      IMAGE_NAME: yourname/my-cicd-demo  # ✅ 본인의 DockerHub 이미지 경로로 수정
+      IMAGE_NAME: tshelldocker/my-cicd-demo  # ✅ 본인의 DockerHub 이미지 경로로 수정
 
     steps:
       - name: 📥 소스코드 Checkout
