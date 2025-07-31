@@ -11,7 +11,7 @@ jobs:
 
     env:
       REGISTRY: docker.io
-      IMAGE_NAME: tshelldocker/my-cicd-demo  # 본인의 DockerHub 이미지 경로
+      IMAGE_NAME: tshelldocker/my-cicd-demo
 
     steps:
       # 1) 전체 커밋 히스토리 포함 체크아웃
@@ -19,6 +19,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          submodules: true
 
       # 2) 워크스페이스 구조 디버그
       - name: 🔍 Debug workspace
@@ -39,7 +40,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4) Production 이미지 빌드
+      # 4) Prod 이미지 빌드
       - name: 📦 Build production images
         run: |
           docker build -f client/Dockerfile.prod \
@@ -47,13 +48,13 @@ jobs:
           docker build -f server/Dockerfile.prod \
             -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
-      # 5) 빌드된 이미지 Push
-      - name: 🚀 Push images to DockerHub
+      # 5) 이미지 푸시
+      - name: 🚀 Push images
         run: |
           docker push $REGISTRY/$IMAGE_NAME:client-latest
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
-      # 6) SSH 키 설정
+      # 6) SSH 키 등록
       - name: 🔑 Set up SSH key
         run: |
           mkdir -p ~/.ssh
@@ -61,29 +62,29 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p 2203 ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
-      # 7) 원격에 nginx 폴더 생성
-      - name: 📂 Create remote nginx directory
+      # 7) 원격 nginx 디렉터리 미리 생성
+      - name: 📂 Create remote nginx dir
         run: |
           ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "mkdir -p /home/apple2ne1/project/nginx"
+            "mkdir -p ~/project/nginx"
 
       # 8a) docker-compose.yml 복사
       - name: 📁 Copy docker-compose.yml via scp
         run: |
           scp -P 2203 docker-compose.yml \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/project/
 
       # 8b) nginx.conf 복사
       - name: 📁 Copy nginx.conf via scp
         run: |
           scp -P 2203 nginx/nginx.conf \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/project/nginx/
 
       # 9) SSH로 접속해 컨테이너 갱신 및 재시작
       - name: 🔧 Deploy via SSH
         run: |
           ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-            cd /home/apple2ne1/project
+            cd ~/project
             docker-compose pull
             docker-compose up -d
           EOF
