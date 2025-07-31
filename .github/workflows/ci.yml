@@ -10,7 +10,7 @@ jobs:
 
     env:
       REGISTRY: docker.io
-      IMAGE_NAME: tshelldocker/my-cicd-demo  # ✅ 본인의 DockerHub 이미지 경로로 수정
+      IMAGE_NAME: tshelldocker/my-cicd-demo  # ✅ 본인의 DockerHub 이미지 경로
 
     steps:
       - name: 📥 소스코드 Checkout
@@ -32,12 +32,24 @@ jobs:
           docker push $REGISTRY/$IMAGE_NAME:client-latest
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
-      - name: 🔑 SSH로 서버 접속하여 배포 스크립트 실행
+      - name: 📁 docker-compose.yml 서버로 복사
+        uses: appleboy/scp-action@v0.1.5
+        with:
+          host: ${{ secrets.HOST }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: 2203                          # ✅ SSH 포트가 2203일 경우 명시적으로 지정
+          source: "./docker-compose.yml"
+          target: "/home/apple2ne1/project/"  # ✅ 서버 내 docker-compose.yml 위치
+
+      - name: 🔑 SSH로 서버 접속하여 docker-compose 실행
         uses: appleboy/ssh-action@v1.0.0
         with:
           host: ${{ secrets.HOST }}
           username: ${{ secrets.USERNAME }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: 2203  # ✅ SSH 포트가 2203일 경우 명시적으로 지정
+          port: 2203
           script: |
-            bash ${{ secrets.DEPLOY_PATH }}
+            cd /home/apple2ne1/project
+            docker-compose pull
+            docker-compose up -d
