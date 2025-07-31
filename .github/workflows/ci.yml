@@ -2,7 +2,8 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
@@ -10,49 +11,74 @@ jobs:
 
     env:
       REGISTRY: docker.io
-      IMAGE_NAME: tshelldocker/my-cicd-demo  # ✅ 본인의 DockerHub 이미지 경로
+      IMAGE_NAME: tshelldocker/my-cicd-demo  # 본인의 DockerHub 이미지 경로
 
     steps:
-      - name: 📥 소스코드 Checkout
+      # 1) 전체 커밋 이력으로 체크아웃 (서브모듈 포함)
+      - name: 📥 Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          submodules: true
 
-      - name: 🐳 DockerHub 로그인
+      # 2) Debug: 워크스페이스 구조 확인
+      - name: 🔍 Debug workspace
+        run: |
+          echo "=== Repository root ==="
+          ls -R .
+          echo ""
+          echo "=== nginx directory ==="
+          ls -al nginx || echo "→ nginx 폴더가 없습니다"
+          echo ""
+          echo "=== docker-compose.yml ==="
+          ls -al docker-compose.yml || echo "→ docker-compose.yml이 없습니다"
+
+      # 3) DockerHub 로그인
+      - name: 🐳 Log in to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 📦 Docker 이미지 빌드
+      # 4) Production 이미지 빌드
+      - name: 📦 Build production images
         run: |
-          docker build -f client/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:client-latest .
-          docker build -f server/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:server-latest ./server
+          docker build -f client/Dockerfile.prod \
+            -t $REGISTRY/$IMAGE_NAME:client-latest .
+          docker build -f server/Dockerfile.prod \
+            -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
-      - name: 🚀 DockerHub에 Push
+      # 5) 빌드된 이미지 Push
+      - name: 🚀 Push images to DockerHub
         run: |
           docker push $REGISTRY/$IMAGE_NAME:client-latest
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
-      - name: 📁 docker-compose.yml 및 nginx.conf 서버로 복사
-        uses: appleboy/scp-action@v0.1.5
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: 2203
-          source: |
-            ./docker-compose.yml
-            ./nginx/nginx.conf
-          target: "/home/apple2ne1/project/"
+      # 6) SSH 키 설정
+      - name: 🔑 Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -p 2203 ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
-      - name: 🔑 SSH로 서버 접속하여 docker-compose 실행
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.HOST }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: 2203
-          script: |
+      # 7a) docker-compose.yml 복사
+      - name: 📁 Copy docker-compose.yml
+        run: |
+          scp -P 2203 docker-compose.yml \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/
+
+      # 7b) nginx.conf 복사
+      - name: 📁 Copy nginx/nginx.conf
+        run: |
+          scp -P 2203 nginx/nginx.conf \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/
+
+      # 8) SSH로 접속해 컨테이너 재시작
+      - name: 🔧 Deploy via SSH
+        run: |
+          ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             cd /home/apple2ne1/project
-            mkdir -p nginx && mv -f nginx.conf nginx/nginx.conf
             docker-compose pull
             docker-compose up -d
+          EOF
