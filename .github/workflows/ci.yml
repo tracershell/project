@@ -2,8 +2,7 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
 
 jobs:
   build-and-deploy:
@@ -11,65 +10,67 @@ jobs:
 
     env:
       REGISTRY: docker.io
-      IMAGE_NAME: tshelldocker/my-cicd-demo
+      IMAGE_NAME: tshelldocker/my-cicd-demo  # 본인의 DockerHub 경로
 
     steps:
+      # 1) 소스코드 체크아웃
       - name: 📥 Checkout code
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - name: 🔍 Debug workspace
-        run: |
-          ls -R .
-          echo "--- nginx 디렉터리 ---"
-          ls -al nginx
-
+      # 2) DockerHub 로그인
       - name: 🐳 Log in to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # 3) 이미지 빌드
       - name: 📦 Build production images
         run: |
-          docker build -f client/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:client-latest .
-          docker build -f server/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:server-latest ./server
+          docker build -f client/Dockerfile.prod \
+            -t $REGISTRY/$IMAGE_NAME:client-latest .
+          docker build -f server/Dockerfile.prod \
+            -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
+      # 4) 이미지 푸시
       - name: 🚀 Push images to DockerHub
         run: |
           docker push $REGISTRY/$IMAGE_NAME:client-latest
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
+      # 5) SSH 키 로드
       - name: 🔑 Set up SSH key
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.SERVER_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -p 2203 ${{ secrets.HOST }} >> ~/.ssh/known_hosts
+        uses: webfactory/ssh-agent@v0.8.1
+        with:
+          ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      - name: 📂 Create remote nginx dir
+      # 6) 원격에 nginx 디렉터리 생성 & 권한 설정
+      - name: 📂 Create remote nginx dir & set perms
         run: |
-          ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "mkdir -p /home/apple2ne1/project/nginx"
+          ssh -o StrictHostKeyChecking=no -p 2203 \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "mkdir -p /home/apple2ne1/project/nginx && \
+             chmod 755 /home/apple2ne1/project/nginx"
 
-      # — 여기부터 수정된 복사 로직 —
-
-      - name: 📁 Copy nginx.conf to temp via scp
+      # 7) docker-compose.yml 복사
+      - name: 📁 Copy docker-compose.yml via scp
         run: |
-          scp -P 2203 nginx/nginx.conf \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/nginx.conf_temp
+          scp -o StrictHostKeyChecking=no -P 2203 \
+            docker-compose.yml \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/docker-compose.yml
 
-      - name: 🔧 Move nginx.conf into place (sudo)
+      # 8) nginx.conf 복사
+      - name: 📑 Copy nginx.conf via scp
         run: |
-          ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-            sudo mv ~/nginx.conf_temp /home/apple2ne1/project/nginx/nginx.conf
-            sudo chown apple2ne1:apple2ne1 /home/apple2ne1/project/nginx/nginx.conf
-          EOF
+          scp -o StrictHostKeyChecking=no -P 2203 \
+            nginx/nginx.conf \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/nginx.conf
 
-      - name: 🔧 Deploy via SSH
+      # 9) SSH로 접속해 docker-compose 실행
+      - name: 🚀 SSH and run docker-compose
         run: |
-          ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -p 2203 \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
             cd /home/apple2ne1/project
             docker-compose pull
             docker-compose up -d
