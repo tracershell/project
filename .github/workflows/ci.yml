@@ -11,49 +11,36 @@ jobs:
 
     env:
       REGISTRY: docker.io
-      IMAGE_NAME: tshelldocker/my-cicd-demo  # 본인의 DockerHub 이미지 경로
+      IMAGE_NAME: tshelldocker/my-cicd-demo
 
     steps:
-      # 1) 전체 커밋 이력 포함 체크아웃
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      # 2) 워크스페이스 구조 디버그
       - name: 🔍 Debug workspace
         run: |
-          echo "=== repo root ==="
           ls -R .
-          echo ""
-          echo "=== nginx directory ==="
-          ls -al nginx || echo "→ nginx 폴더가 없습니다"
-          echo ""
-          echo "=== docker-compose.yml ==="
-          ls -al docker-compose.yml || echo "→ docker-compose.yml이 없습니다"
+          echo "--- nginx 디렉터리 ---"
+          ls -al nginx
 
-      # 3) DockerHub 로그인
       - name: 🐳 Log in to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 4) Production 이미지 빌드
       - name: 📦 Build production images
         run: |
-          docker build -f client/Dockerfile.prod \
-            -t $REGISTRY/$IMAGE_NAME:client-latest .
-          docker build -f server/Dockerfile.prod \
-            -t $REGISTRY/$IMAGE_NAME:server-latest ./server
+          docker build -f client/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:client-latest .
+          docker build -f server/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
-      # 5) 빌드된 이미지 Push
       - name: 🚀 Push images to DockerHub
         run: |
           docker push $REGISTRY/$IMAGE_NAME:client-latest
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
-      # 6) SSH 키 설정
       - name: 🔑 Set up SSH key
         run: |
           mkdir -p ~/.ssh
@@ -61,25 +48,25 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p 2203 ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
-      # 7) 원격 nginx 디렉터리 생성
       - name: 📂 Create remote nginx dir
         run: |
           ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
             "mkdir -p /home/apple2ne1/project/nginx"
 
-      # 8a) docker-compose.yml 복사 (절대 경로)
-      - name: 📁 Copy docker-compose.yml via scp
-        run: |
-          scp -P 2203 docker-compose.yml \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/docker-compose.yml
+      # — 여기부터 수정된 복사 로직 —
 
-      # 8b) nginx.conf 복사 (절대 경로로 파일명까지 지정)
-      - name: 📁 Copy nginx.conf via scp
+      - name: 📁 Copy nginx.conf to temp via scp
         run: |
           scp -P 2203 nginx/nginx.conf \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/nginx.conf
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/nginx.conf_temp
 
-      # 9) SSH로 접속해 컨테이너 갱신 및 재시작
+      - name: 🔧 Move nginx.conf into place (sudo)
+        run: |
+          ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+            sudo mv ~/nginx.conf_temp /home/apple2ne1/project/nginx/nginx.conf
+            sudo chown apple2ne1:apple2ne1 /home/apple2ne1/project/nginx/nginx.conf
+          EOF
+
       - name: 🔧 Deploy via SSH
         run: |
           ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
