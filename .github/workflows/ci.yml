@@ -14,17 +14,16 @@ jobs:
       IMAGE_NAME: tshelldocker/my-cicd-demo  # 본인의 DockerHub 이미지 경로
 
     steps:
-      # 1) 전체 커밋 이력으로 체크아웃 (서브모듈 포함)
+      # 1) 전체 커밋 히스토리 포함 체크아웃
       - name: 📥 Checkout code
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          submodules: true
 
-      # 2) Debug: 워크스페이스 구조 확인
+      # 2) 워크스페이스 구조 디버그
       - name: 🔍 Debug workspace
         run: |
-          echo "=== Repository root ==="
+          echo "=== repo root ==="
           ls -R .
           echo ""
           echo "=== nginx directory ==="
@@ -62,19 +61,25 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan -p 2203 ${{ secrets.HOST }} >> ~/.ssh/known_hosts
 
-      # 7a) docker-compose.yml 복사
-      - name: 📁 Copy docker-compose.yml
+      # 7) 원격에 nginx 폴더 생성
+      - name: 📂 Create remote nginx directory
+        run: |
+          ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "mkdir -p /home/apple2ne1/project/nginx"
+
+      # 8a) docker-compose.yml 복사
+      - name: 📁 Copy docker-compose.yml via scp
         run: |
           scp -P 2203 docker-compose.yml \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/
 
-      # 7b) nginx.conf 복사
-      - name: 📁 Copy nginx/nginx.conf
+      # 8b) nginx.conf 복사
+      - name: 📁 Copy nginx.conf via scp
         run: |
           scp -P 2203 nginx/nginx.conf \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/
 
-      # 8) SSH로 접속해 컨테이너 재시작
+      # 9) SSH로 접속해 컨테이너 갱신 및 재시작
       - name: 🔧 Deploy via SSH
         run: |
           ssh -p 2203 ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
