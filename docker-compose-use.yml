@@ -1,0 +1,19 @@
+
+services:
+  node:
+    build:
+      context: ./server
+      dockerfile: Dockerfile.prod
+    container_name: node
+    ports:
+      - "3003:3003"
+
+  nginx:
+    build:
+      context: .
+      dockerfile: client/Dockerfile.prod
+    container_name: nginx
+    ports:
+      - "8003:8003"
+    depends_on:
+      - node

@@ -1,19 +1,18 @@
-
 services:
   node:
-    build:
-      context: ./server
-      dockerfile: Dockerfile.prod
+    image: docker.io/tshelldocker/my-cicd-demo:server-latest
     container_name: node
     ports:
-      - "3033:3033"
+      - "3003:3003"
+    restart: unless-stopped
 
   nginx:
-    build:
-      context: .
-      dockerfile: client/Dockerfile.prod
+    image: docker.io/tshelldocker/my-cicd-demo:client-latest
     container_name: nginx
     ports:
-      - "80:80"
+      - "8003:8003"
     depends_on:
       - node
+    volumes:
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
+    restart: unless-stopped
