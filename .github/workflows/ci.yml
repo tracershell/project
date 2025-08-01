@@ -24,10 +24,8 @@ jobs:
 
       - name: 📦 Build production images
         run: |
-          docker build -f client/Dockerfile.prod \
-            -t $REGISTRY/$IMAGE_NAME:client-latest .
-          docker build -f server/Dockerfile.prod \
-            -t $REGISTRY/$IMAGE_NAME:server-latest ./server
+          docker build -f client/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:client-latest .
+          docker build -f server/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
       - name: 🚀 Push images to DockerHub
         run: |
@@ -47,9 +45,10 @@ jobs:
 
       - name: 🔐 Set ownership for nginx directory
         run: |
-          ssh -o StrictHostKeyChecking=no -p 2203 \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/apple2ne1/project/nginx"
+          ssh -t -o StrictHostKeyChecking=no -p 2203 \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
+echo '${{ secrets.SSH_SUDO_PASSWORD }}' | sudo -S chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/apple2ne1/project/nginx
+EOF
 
       - name: 📁 Copy docker-compose.yml via scp
         run: |
