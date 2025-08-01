@@ -1,5 +1,4 @@
 name: CI/CD Pipeline
-
 on:
   push:
     branches: [main]
@@ -35,10 +34,11 @@ jobs:
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
       - name: 🔑 Set up SSH key
-        uses: webfactory/ssh-agent@v0.8.0       # ← 여기를 v0.8.0 으로 변경
+        uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
+      # ← 여기서 chmod 없이 디렉터리 생성만
       - name: 📂 Create remote nginx dir
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
@@ -61,7 +61,7 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-            cd /home/apple2ne1/project
-            docker-compose pull
-            docker-compose up -d
+              cd /home/apple2ne1/project
+              docker-compose pull
+              docker-compose up -d
           EOF
