@@ -2,7 +2,8 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
 
 jobs:
   build-and-deploy:
@@ -13,15 +14,18 @@ jobs:
       IMAGE_NAME: tshelldocker/my-cicd-demo
 
     steps:
+      # 1. 코드 체크아웃
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
+      # 2. DockerHub 로그인
       - name: 🐳 Log in to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # 3. 프로덕션 이미지 빌드
       - name: 📦 Build production images
         run: |
           docker build -f client/Dockerfile.prod \
@@ -29,41 +33,49 @@ jobs:
           docker build -f server/Dockerfile.prod \
             -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
+      # 4. 이미지 푸시
       - name: 🚀 Push images to DockerHub
         run: |
           docker push $REGISTRY/$IMAGE_NAME:client-latest
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
+      # 5. SSH 키 세팅
       - name: 🔑 Set up SSH key
         uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      # 1) 사용자 권한으로 nginx 디렉터리 생성
+      # 6. 원격에 nginx 디렉터리 만들기
       - name: 📂 Create remote nginx dir
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "mkdir -p /home/apple2ne1/project/nginx"
+            "mkdir -p ~/project/nginx"
 
-      # 2) docker-compose.yml 전송
+      # 7. nginx 디렉터리 소유권 수정 (apple2ne1 계정에 쓰기 권한 부여)
+      - name: 🔧 Fix nginx dir ownership
+        run: |
+          ssh -o StrictHostKeyChecking=no -p 2203 \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+            "sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} ~/project/nginx"
+
+      # 8. docker-compose.yml 복사
       - name: 📁 Copy docker-compose.yml via scp
         run: |
           scp -o StrictHostKeyChecking=no -P 2203 \
             docker-compose.yml \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/docker-compose.yml
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/project/docker-compose.yml
 
-      # 3) nginx.conf 전송
+      # 9. nginx.conf 복사
       - name: 📑 Copy nginx.conf via scp
         run: |
           scp -o StrictHostKeyChecking=no -P 2203 \
             nginx/nginx.conf \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/nginx.conf
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/project/nginx/nginx.conf
 
-      # 4) 배포 (docker-compose pull & up)
+      # 10. 배포: docker-compose pull & up
       - name: 🚀 SSH and run docker-compose
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-              "cd /home/apple2ne1/project && docker-compose pull && docker-compose up -d"
-            EOF
+            "cd ~/project && docker-compose pull && docker-compose up -d"
