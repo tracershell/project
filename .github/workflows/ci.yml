@@ -24,8 +24,10 @@ jobs:
 
       - name: 📦 Build production images
         run: |
-          docker build -f client/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:client-latest .
-          docker build -f server/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:server-latest ./server
+          docker build -f client/Dockerfile.prod \
+            -t $REGISTRY/$IMAGE_NAME:client-latest .
+          docker build -f server/Dockerfile.prod \
+            -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
       - name: 🚀 Push images to DockerHub
         run: |
@@ -37,31 +39,28 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
+      # 1) 사용자 권한으로 nginx 디렉터리 생성
       - name: 📂 Create remote nginx dir
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
             "mkdir -p /home/apple2ne1/project/nginx"
 
-      - name: 🔐 Set ownership for nginx directory
-        run: |
-          ssh -t -o StrictHostKeyChecking=no -p 2203 \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-echo '${{ secrets.SSH_SUDO_PASSWORD }}' | sudo -S chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} /home/apple2ne1/project/nginx
-EOF
-
+      # 2) docker-compose.yml 전송
       - name: 📁 Copy docker-compose.yml via scp
         run: |
           scp -o StrictHostKeyChecking=no -P 2203 \
             docker-compose.yml \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/docker-compose.yml
 
+      # 3) nginx.conf 전송
       - name: 📑 Copy nginx.conf via scp
         run: |
           scp -o StrictHostKeyChecking=no -P 2203 \
             nginx/nginx.conf \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/nginx.conf
 
+      # 4) 배포 (docker-compose pull & up)
       - name: 🚀 SSH and run docker-compose
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
