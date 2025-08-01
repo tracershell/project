@@ -64,8 +64,6 @@ jobs:
       - name: 🚀 SSH and run docker-compose
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }} << 'EOF'
-              cd /home/apple2ne1/project
-              docker-compose pull
-              docker-compose up -d
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
+              "cd /home/apple2ne1/project && docker-compose pull && docker-compose up -d"
             EOF
