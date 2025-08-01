@@ -1,4 +1,5 @@
 name: CI/CD Pipeline
+
 on:
   push:
     branches: [main]
@@ -6,40 +7,55 @@ on:
 jobs:
   build-and-deploy:
     runs-on: ubuntu-latest
+
     env:
       REGISTRY: docker.io
       IMAGE_NAME: tshelldocker/my-cicd-demo
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/login-action@v3
+      - name: 📥 Checkout code
+        uses: actions/checkout@v4
+
+      - name: 🐳 Log in to DockerHub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - run: |
-          docker build -f client/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:client-latest .
-          docker build -f server/Dockerfile.prod -t $REGISTRY/$IMAGE_NAME:server-latest ./server
+      - name: 📦 Build production images
+        run: |
+          docker build -f client/Dockerfile.prod \
+            -t $REGISTRY/$IMAGE_NAME:client-latest .
+          docker build -f server/Dockerfile.prod \
+            -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
-      - run: |
+      - name: 🚀 Push images to DockerHub
+        run: |
           docker push $REGISTRY/$IMAGE_NAME:client-latest
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
-      - uses: webfactory/ssh-agent@v0.8.0
+      - name: 🔑 Set up SSH key
+        uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      - name: 📂 Ensure nginx dir on remote
+      - name: 📂 Create remote nginx dir
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "sudo mkdir -p /home/apple2ne1/project/nginx"
+            "mkdir -p /home/apple2ne1/project/nginx"
 
-      - name: 📑 Upload nginx.conf via sudo tee
+      - name: 📁 Copy docker-compose.yml via scp
         run: |
-          cat nginx/nginx.conf | ssh -o StrictHostKeyChecking=no -p 2203 \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "sudo tee /home/apple2ne1/project/nginx/nginx.conf > /dev/null"
+          scp -o StrictHostKeyChecking=no -P 2203 \
+            docker-compose.yml \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/docker-compose.yml
+
+      - name: 📑 Copy nginx.conf via scp
+        run: |
+          scp -o StrictHostKeyChecking=no -P 2203 \
+            nginx/nginx.conf \
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/nginx.conf
 
       - name: 🚀 SSH and run docker-compose
         run: |
