@@ -10,21 +10,18 @@ jobs:
 
     env:
       REGISTRY: docker.io
-      IMAGE_NAME: tshelldocker/my-cicd-demo  # 본인의 DockerHub 경로
+      IMAGE_NAME: tshelldocker/my-cicd-demo
 
     steps:
-      # 1) 소스코드 체크아웃
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      # 2) DockerHub 로그인
       - name: 🐳 Log in to DockerHub
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # 3) 이미지 빌드
       - name: 📦 Build production images
         run: |
           docker build -f client/Dockerfile.prod \
@@ -32,41 +29,34 @@ jobs:
           docker build -f server/Dockerfile.prod \
             -t $REGISTRY/$IMAGE_NAME:server-latest ./server
 
-      # 4) 이미지 푸시
       - name: 🚀 Push images to DockerHub
         run: |
           docker push $REGISTRY/$IMAGE_NAME:client-latest
           docker push $REGISTRY/$IMAGE_NAME:server-latest
 
-      # 5) SSH 키 로드
       - name: 🔑 Set up SSH key
-        uses: webfactory/ssh-agent@v0.8.1
+        uses: webfactory/ssh-agent@v0.8.0       # ← 여기를 v0.8.0 으로 변경
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      # 6) 원격에 nginx 디렉터리 생성 & 권한 설정
       - name: 📂 Create remote nginx dir & set perms
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "mkdir -p /home/apple2ne1/project/nginx && \
-             chmod 755 /home/apple2ne1/project/nginx"
+            "mkdir -p /home/apple2ne1/project/nginx && chmod 755 /home/apple2ne1/project/nginx"
 
-      # 7) docker-compose.yml 복사
       - name: 📁 Copy docker-compose.yml via scp
         run: |
           scp -o StrictHostKeyChecking=no -P 2203 \
             docker-compose.yml \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/docker-compose.yml
 
-      # 8) nginx.conf 복사
       - name: 📑 Copy nginx.conf via scp
         run: |
           scp -o StrictHostKeyChecking=no -P 2203 \
             nginx/nginx.conf \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/apple2ne1/project/nginx/nginx.conf
 
-      # 9) SSH로 접속해 docker-compose 실행
       - name: 🚀 SSH and run docker-compose
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
