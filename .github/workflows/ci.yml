@@ -45,30 +45,30 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      # 6. 원격에 nginx 디렉터리 만들기 (퍼미션 755 지정)
-      - name: 📂 Create remote nginx dir (with 755 perms)
+      # 6. 기존 nginx.conf(파일 혹은 디렉터리) 제거 & nginx 디렉터리 생성 (755 perms)
+      - name: 📂 Prepare remote nginx dir
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "mkdir -p -m 755 ~/project/nginx"
+            "rm -rf ~/project/nginx/nginx.conf && mkdir -p -m 755 ~/project/nginx"
 
       # 7. docker-compose.yml 복사
       - name: 📁 Copy docker-compose.yml via scp
         run: |
           scp -o StrictHostKeyChecking=no -P 2203 \
             docker-compose.yml \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/project/docker-compose.yml
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/${{ secrets.USERNAME }}/project/docker-compose.yml
 
-      # 8. nginx.conf 복사
+      # 8. nginx.conf 복사 (절대 경로 지정)
       - name: 📑 Copy nginx.conf via scp
         run: |
           scp -o StrictHostKeyChecking=no -P 2203 \
             nginx/nginx.conf \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:~/project/nginx/nginx.conf
+            ${{ secrets.USERNAME }}@${{ secrets.HOST }}:/home/${{ secrets.USERNAME }}/project/nginx/nginx.conf
 
       # 9. 배포: docker-compose pull & up
       - name: 🚀 SSH and run docker-compose
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "cd ~/project && docker-compose pull && docker-compose up -d"
+            "cd /home/${{ secrets.USERNAME }}/project && docker-compose pull && docker-compose up -d"
