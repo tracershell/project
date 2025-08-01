@@ -39,11 +39,11 @@ jobs:
         with:
           ssh-private-key: ${{ secrets.SERVER_SSH_KEY }}
 
-      - name: 📂 Create remote nginx dir & set perms
+      - name: 📂 Create remote nginx dir
         run: |
           ssh -o StrictHostKeyChecking=no -p 2203 \
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "mkdir -p /home/apple2ne1/project/nginx && chmod 755 /home/apple2ne1/project/nginx"
+            "mkdir -p /home/apple2ne1/project/nginx"
 
       - name: 📁 Copy docker-compose.yml via scp
         run: |
