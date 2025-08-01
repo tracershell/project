@@ -52,12 +52,7 @@ jobs:
             ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
             "mkdir -p ~/project/nginx"
 
-      # 7. nginx 디렉터리 소유권 수정 (apple2ne1 계정에 쓰기 권한 부여)
-      - name: 🔧 Fix nginx dir ownership
-        run: |
-          ssh -o StrictHostKeyChecking=no -p 2203 \
-            ${{ secrets.USERNAME }}@${{ secrets.HOST }} \
-            "sudo chown -R ${{ secrets.USERNAME }}:${{ secrets.USERNAME }} ~/project/nginx"
+   
 
       # 8. docker-compose.yml 복사
       - name: 📁 Copy docker-compose.yml via scp
